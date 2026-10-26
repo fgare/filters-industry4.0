@@ -22,7 +22,8 @@ def resolve_path(env_var_name: str, default_folder: str) -> str:
     return val if os.path.isabs(val) else os.path.join(BASE_DIR, val)
 
 OPC_SERVER_URL = os.getenv("OPC_SERVER_URL", "opc.tcp://192.168.1.50:4840")
-NAMESPACE_INDEX = int(os.getenv("NAMESPACE_INDEX", "2"))
+NAMESPACE_INDEX = int(os.getenv("NAMESPACE_INDEX", "4"))
+MACHINE_NAME = os.getenv("MACHINE_NAME", "macchinaSconosciuta")
 
 FOLDER_LOG = resolve_path("FOLDER_LOG", "log")
 FOLDER_IN = resolve_path("FOLDER_IN", "queue_in")
@@ -54,7 +55,7 @@ console_handler = logging.StreamHandler(sys.stdout)
 console_handler.setLevel(logging.DEBUG)
 
 formatter = logging.Formatter(
-    fmt="%(asctime)s [%(levelname)s] [%(filename)s:%(lineno)d] %(message)s",
+    fmt="%(asctime)s %(levelname)s %(message)s",
     datefmt="%Y-%m-%d %H:%M:%S"
 )
 file_handler.setFormatter(formatter)
@@ -69,31 +70,31 @@ if not logger.handlers:
 # ==============================================================================
 TAG_NODES = {
     # Parametri di ricetta e comandi
-    "Flag_In": f"ns={NAMESPACE_INDEX};s=Flag_In",
-    "Nome Commessa": f"ns={NAMESPACE_INDEX};s=Nome Commessa",
-    "Set_Temperatura_Zona_1": f"ns={NAMESPACE_INDEX};s=Set_Temperatura_Zona_1",
-    "Set_Temperatura_Zona_2": f"ns={NAMESPACE_INDEX};s=Set_Temperatura_Zona_2",
-    "Set_Temperatura_Zona_3": f"ns={NAMESPACE_INDEX};s=Set_Temperatura_Zona_3",
-    "Set_Temperatura_Zona_4": f"ns={NAMESPACE_INDEX};s=Set_Temperatura_Zona_4",
-    "Set_Temperatura_Zona_5": f"ns={NAMESPACE_INDEX};s=Set_Temperatura_Zona_5",
-    "Set_Temperatura_Zona_6": f"ns={NAMESPACE_INDEX};s=Set_Temperatura_Zona_6",
-    "Flag_Out": f"ns={NAMESPACE_INDEX};s=Flag_Out",
+    "Flag_In": "ns=4;i=12",
+    "Nome Commessa": "ns=4;i=23",
+    "Set_Temperatura_Zona_1": "ns=4;i=34",
+    "Set_Temperatura_Zona_2": "ns=4;i=45",
+    "Set_Temperatura_Zona_3": "ns=4;i=56",
+    "Set_Temperatura_Zona_4": "ns=4;i=67",
+    "Set_Temperatura_Zona_5": "ns=4;i=78",
+    "Set_Temperatura_Zona_6": "ns=4;i=89",
+    "Flag_Out": "ns=4;i=100",
 
     # Consuntivi di fine commessa
-    "Ora Inizio": f"ns={NAMESPACE_INDEX};s=Ora Inizio",
-    "Ora_Fine": f"ns={NAMESPACE_INDEX};s=Ora_Fine",
-    "Tempo Lavorazione": f"ns={NAMESPACE_INDEX};s=Tempo Lavorazione",
-    "Kwh_Commessa": f"ns={NAMESPACE_INDEX};s=Kwh_Commessa",
+    "Ora Inizio": "ns=4;i=111",
+    "Ora_Fine": "ns=4;i=122",
+    "Tempo Lavorazione": "ns=4;i=133",
+    "Kwh_Commessa": "ns=4;i=166",
 
     # Telemetria periodica
-    "Consumo_Kw": f"ns={NAMESPACE_INDEX};s=Consumo_Kw",
-    "Consumo_Kwh": f"ns={NAMESPACE_INDEX};s=Consumo_Kwh",
-    "Read_Temparatura_Zona_1": f"ns={NAMESPACE_INDEX};s=Read_Temparatura_Zona_1",
-    "Read_Temparatura_Zona_2": f"ns={NAMESPACE_INDEX};s=Read_Temparatura_Zona_2",
-    "Read_Temparatura_Zona_3": f"ns={NAMESPACE_INDEX};s=Read_Temparatura_Zona_3",
-    "Read_Temparatura_Zona_4": f"ns={NAMESPACE_INDEX};s=Read_Temparatura_Zona_4",
-    "Read_Temparatura_Zona_5": f"ns={NAMESPACE_INDEX};s=Read_Temparatura_Zona_5",
-    "Read_Temparatura_Zona_6": f"ns={NAMESPACE_INDEX};s=Read_Temparatura_Zona_6",
+    "Consumo_Kw": "ns=4;i=144",
+    "Consumo_Kwh": "ns=4;i=155",
+    "Read_Temparatura_Zona_1": "ns=4;i=177",
+    "Read_Temparatura_Zona_2": "ns=4;i=188",
+    "Read_Temparatura_Zona_3": "ns=4;i=199",
+    "Read_Temparatura_Zona_4": "ns=4;i=210",
+    "Read_Temparatura_Zona_5": "ns=4;i=221",
+    "Read_Temparatura_Zona_6": "ns=4;i=232",
 }
 
 
@@ -188,7 +189,7 @@ async def handle_telemetry_and_completion(client: Client):
             raw_values[tag_name] = None
 
     # Esportazione snapshot CSV per ogni esecuzione
-    csv_filename = f"telemetria_{timestamp_exec.strftime('%Y%m%d_%H%M%S')}.csv"
+    csv_filename = f"{MACHINE_NAME}_{timestamp_exec.strftime('%Y%m%d_%H%M%S')}.csv"
     csv_path = os.path.join(FOLDER_OUT, csv_filename)
     try:
         with open(csv_path, mode="w", newline="", encoding="utf-8") as f:
