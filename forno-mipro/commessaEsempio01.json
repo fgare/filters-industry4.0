@@ -1,11 +1,11 @@
 {
-  "nome_commessa": "ORD_PROVA_MIES_20261026",
+  "nome_commessa": "COMM_PROVA_20261027",
   "set_temperatura_zone": [
-    180.0,
-    185.5,
-    190.0,
-    190.0,
-    185.0,
-    180.0
+    110.0,
+    120.5,
+    130.0,
+    140.0,
+    150.0,
+    160.0
   ]
 }
