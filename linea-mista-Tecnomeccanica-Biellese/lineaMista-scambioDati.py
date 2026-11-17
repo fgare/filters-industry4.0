@@ -14,6 +14,7 @@ load_dotenv()
 
 OPC_SERVER_URL = os.getenv("OPC_SERVER_URL", "opc.tcp://192.168.0.20:4840")
 NAMESPACE_INDEX = int(os.getenv("NAMESPACE_INDEX", 2))
+DEVICE_NAME = os.getenv("DEVICE_NAME", "PLC-GENERALE")
 
 DIR_COMMESSE = os.getenv("DIR_COMMESSE", "./commesse_nuove")
 DIR_COMMESSE_ELABORATE = os.getenv("DIR_COMMESSE_ELABORATE", "./commesse_elaborate")
@@ -26,10 +27,10 @@ os.makedirs(DIR_COMMESSE, exist_ok=True)
 os.makedirs(DIR_COMMESSE_ELABORATE, exist_ok=True)
 os.makedirs(DIR_CSV, exist_ok=True)
 
-# Generazione nomi file CSV una tantum all'avvio del demone
+# Nomi file CSV (un solo underscore tra nome e timestamp)
 timestamp_avvio = datetime.now().strftime("%Y%m%d%H%M%S")
-CSV_MONITORAGGIO_FILE = os.path.join(DIR_CSV, f"Linea Mista_monitoraggio_{timestamp_avvio}.csv")
-CSV_ARCHIVIO_LOTTI_FILE = os.path.join(DIR_CSV, f"Linea Mista_archivioFineLotti_{timestamp_avvio}.csv")
+CSV_MONITORAGGIO_FILE = os.path.join(DIR_CSV, f"Linea Mista_monitor_{timestamp_avvio}.csv")
+CSV_ARCHIVIO_LOTTI_FILE = os.path.join(DIR_CSV, f"Linea Mista_lotti_{timestamp_avvio}.csv")
 
 def setup_logger():
     log_dir = "log"
@@ -65,71 +66,77 @@ def setup_logger():
 
 logger = setup_logger()
 
-DEVICE_NAME = "PLC-GENERALE"
+# ==============================================================================
+# MAPPATURA GRUPPI E TAG OPC-UA
+# ==============================================================================
+GRP_SCAMBIO_R  = "0_BIT/WORD_SCAMBIO_LINEA>GESTIONALE_(R)"
+GRP_SCAMBIO_W  = "1_BIT_SCAMBIO_GESTIONALE>LINEA_(W)"
+GRP_LOTTO_W    = "2_DATI_LOTTO_DA_GESTIONALE_A_LINEA_(W)"
+GRP_LAVORO_R   = "4_VISIONE_DATI_LOTTO_ATTUALI_IN_LAVORO_(R)"
+GRP_VEL_R      = "5_VISIONE_VELOCITA'_ATTUALI_(R)"
+GRP_ARCHIVIO_R = "6_VISIONE_DATI_LOTTO_DA_ARCHIVIARE_(R)"
 
-# Mapping Tag OPC-UA (Gruppi e Variabili)
-GRP_SCAMBIO_R = "0_BIT/WORD_SCAMBIO_LINEA>GESTIONALE_(R)"
-GRP_SCAMBIO_W = "1_BIT_SCAMBIO_GESTIONALE>LINEA_(W)"
-GRP_LOTTO_W   = "2_DATI_LOTTO_DA_GESTIONALE_A_LINEA_(W)"
-GRP_LAVORO_R  = "4_VISIONE_DATI_LOTTO_ATTUALI_IN_LAVORO_(R)"
-GRP_VEL_R     = "5_VISIONE_VELOCITA'_ATTUALI_(R)"
-GRP_ARCHIVIO_R= "6_VISIONE_DATI_LOTTO_DA_ARCHIVIARE_(R)"
-
+# Mappa scrittura ricetta da JSON -> PLC (Gruppo 2)
 RICETTA_TAGS_MAP = [
-    ("Numero_Lotto",                    "01_Numero_Lotto",                                                     ua.VariantType.UInt32),
-    ("Codice_Lotto",                    "02_Codice_Lotto",                                                     ua.VariantType.String),
-    ("Articolo_Lotto",                  "03_Articolo_Lotto",                                                   ua.VariantType.String),
-    ("SET_TOTALE_grammi_DOSAGGIO",      "04_SET_TOTALE_grammi_DOSAGGIO_(#####gr)",                             ua.VariantType.Float),
-    ("SET_VELOCITA_NASTRO_RACCOLTA",    "05_SET_VELOCITA'_NASTRO_RACCOLTA_(###.#%)",                           ua.VariantType.Float),
-    ("SET_COMPONENTE_CARICATORE_1",     "06_SET_COMPONENTE_CARICATORE_1_(###.#%)",                             ua.VariantType.Float),
-    ("SET_VELOCITA_NASTRO_PUNTE_CAR_1", "07_SET_VELOCITA'_NASTRO_A_PUNTE_SCARICO_CARICATORE_1_(###.#%)",       ua.VariantType.Float),
-    ("SET_VELOCITA_CILINDRO_LIM_CAR_1", "08_SET_VELOCITA'_CILINDRO_LIMITATORE_CARICATORE_1_(###.#%)",          ua.VariantType.Float),
-    ("SET_VELOCITA_TAVOLA_BASE_CAR_1",  "09_SET_VELOCITA'_AVANZAMENTO_TAVOLA_BASE_CARICATORE_1_(###.#%)",      ua.VariantType.Float),
-    ("SET_COMPONENTE_CARICATORE_2",     "10_SET_COMPONENTE_CARICATORE_2_(###.#%)",                             ua.VariantType.Float),
-    ("SET_VELOCITA_NASTRO_PUNTE_CAR_2", "11_SET_VELOCITA'_NASTRO_A_PUNTE_SCARICO_CARICATORE_2_(###.#%)",       ua.VariantType.Float),
-    ("SET_VELOCITA_CILINDRO_LIM_CAR_2", "12_SET_VELOCITA'_CILINDRO_LIMITATORE_CARICATORE_2_(###.#%)",          ua.VariantType.Float),
-    ("SET_VELOCITA_TAVOLA_BASE_CAR_2",  "13_SET_VELOCITA'_AVANZAMENTO_TAVOLA_BASE_CARICATORE_2_(###.#%)",      ua.VariantType.Float),
-    ("SET_COMPONENTE_CARICATORE_3",     "14_SET_COMPONENTE_CARICATORE_3_(###.#%)",                             ua.VariantType.Float),
-    ("SET_VELOCITA_NASTRO_PUNTE_CAR_3", "15_SET_VELOCITA'_NASTRO_A_PUNTE_SCARICO_CARICATORE_3_(###.#%)",       ua.VariantType.Float),
-    ("SET_VELOCITA_CILINDRO_LIM_CAR_3", "16_SET_VELOCITA'_CILINDRO_LIMITATORE_CARICATORE_3_(###.#%)",          ua.VariantType.Float),
-    ("SET_VELOCITA_TAVOLA_BASE_CAR_3",  "17_SET_VELOCITA'_AVANZAMENTO_TAVOLA_BASE_CARICATORE_3_(###.#%)",      ua.VariantType.Float),
-    ("SET_COMPONENTE_CARICATORE_4",     "18_SET_COMPONENTE_CARICATORE_4_(###.#%)",                             ua.VariantType.Float),
-    ("SET_VELOCITA_NASTRO_PUNTE_CAR_4", "19_SET_VELOCITA'_NASTRO_A_PUNTE_SCARICO_CARICATORE_4_(###.#%)",       ua.VariantType.Float),
-    ("SET_VELOCITA_CILINDRO_LIM_CAR_4", "20_SET_VELOCITA'_CILINDRO_LIMITATORE_CARICATORE_4_(###.#%)",          ua.VariantType.Float),
-    ("SET_VELOCITA_TAVOLA_BASE_CAR_4",  "21_SET_VELOCITA'_AVANZAMENTO_TAVOLA_BASE_CARICATORE_4_(###.#%)",      ua.VariantType.Float),
-    ("SET_COMPONENTE_CARICATORE_5",     "22_SET_COMPONENTE_CARICATORE_5_(###.#%)",                             ua.VariantType.Float),
-    ("SET_VELOCITA_NASTRO_PUNTE_CAR_5", "23_SET_VELOCITA'_NASTRO_A_PUNTE_SCARICO_CARICATORE_5_(###.#%)",       ua.VariantType.Float),
-    ("SET_VELOCITA_CILINDRO_LIM_CAR_5", "24_SET_VELOCITA'_CILINDRO_LIMITATORE_CARICATORE_5_(###.#%)",          ua.VariantType.Float),
-    ("SET_VELOCITA_TAVOLA_BASE_CAR_5",  "25_SET_VELOCITA'_AVANZAMENTO_TAVOLA_BASE_CARICATORE_5_(###.#%)",      ua.VariantType.Float),
+    ("Numero_Lotto",                    "01_Numero_Lotto",                                                ua.VariantType.UInt32),
+    ("Codice_Lotto",                    "02_Codice_Lotto",                                                ua.VariantType.String),
+    ("Articolo_Lotto",                  "03_Articolo_Lotto",                                              ua.VariantType.String),
+    ("SET_TOTALE_grammi_DOSAGGIO",      "04_SET_TOTALE_grammi_DOSAGGIO_(#####gr)",                        ua.VariantType.Float),
+    ("SET_VELOCITA_NASTRO_RACCOLTA",    "05_SET_VELOCITA'_NASTRO_RACCOLTA_(###.#%)",                      ua.VariantType.Float),
+    ("SET_COMPONENTE_CARICATORE_1",     "06_SET_COMPONENTE_CARICATORE_1_(###.#%)",                        ua.VariantType.Float),
+    ("SET_VELOCITA_NASTRO_PUNTE_CAR_1", "07_SET_VELOCITA'_NASTRO_A_PUNTE_SCARICO_CARICATORE_1_(###.#%)",  ua.VariantType.Float),
+    ("SET_VELOCITA_CILINDRO_LIM_CAR_1", "08_SET_VELOCITA'_CILINDRO_LIMITATORE_CARICATORE_1_(###.#%)",     ua.VariantType.Float),
+    ("SET_VELOCITA_TAVOLA_BASE_CAR_1",  "09_SET_VELOCITA'_AVANZAMENTO_TAVOLA_BASE_CARICATORE_1_(###.#%)", ua.VariantType.Float),
+    ("SET_COMPONENTE_CARICATORE_2",     "10_SET_COMPONENTE_CARICATORE_2_(###.#%)",                        ua.VariantType.Float),
+    ("SET_VELOCITA_NASTRO_PUNTE_CAR_2", "11_SET_VELOCITA'_NASTRO_A_PUNTE_SCARICO_CARICATORE_2_(###.#%)",  ua.VariantType.Float),
+    ("SET_VELOCITA_CILINDRO_LIM_CAR_2", "12_SET_VELOCITA'_CILINDRO_LIMITATORE_CARICATORE_2_(###.#%)",     ua.VariantType.Float),
+    ("SET_VELOCITA_TAVOLA_BASE_CAR_2",  "13_SET_VELOCITA'_AVANZAMENTO_TAVOLA_BASE_CARICATORE_2_(###.#%)", ua.VariantType.Float),
+    ("SET_COMPONENTE_CARICATORE_3",     "14_SET_COMPONENTE_CARICATORE_3_(###.#%)",                        ua.VariantType.Float),
+    ("SET_VELOCITA_NASTRO_PUNTE_CAR_3", "15_SET_VELOCITA'_NASTRO_A_PUNTE_SCARICO_CARICATORE_3_(###.#%)",  ua.VariantType.Float),
+    ("SET_VELOCITA_CILINDRO_LIM_CAR_3", "16_SET_VELOCITA'_CILINDRO_LIMITATORE_CARICATORE_3_(###.#%)",     ua.VariantType.Float),
+    ("SET_VELOCITA_TAVOLA_BASE_CAR_3",  "17_SET_VELOCITA'_AVANZAMENTO_TAVOLA_BASE_CARICATORE_3_(###.#%)", ua.VariantType.Float),
+    ("SET_COMPONENTE_CARICATORE_4",     "18_SET_COMPONENTE_CARICATORE_4_(###.#%)",                        ua.VariantType.Float),
+    ("SET_VELOCITA_NASTRO_PUNTE_CAR_4", "19_SET_VELOCITA'_NASTRO_A_PUNTE_SCARICO_CARICATORE_4_(###.#%)",  ua.VariantType.Float),
+    ("SET_VELOCITA_CILINDRO_LIM_CAR_4", "20_SET_VELOCITA'_CILINDRO_LIMITATORE_CARICATORE_4_(###.#%)",     ua.VariantType.Float),
+    ("SET_VELOCITA_TAVOLA_BASE_CAR_4",  "21_SET_VELOCITA'_AVANZAMENTO_TAVOLA_BASE_CARICATORE_4_(###.#%)", ua.VariantType.Float),
+    ("SET_COMPONENTE_CARICATORE_5",     "22_SET_COMPONENTE_CARICATORE_5_(###.#%)",                        ua.VariantType.Float),
+    ("SET_VELOCITA_NASTRO_PUNTE_CAR_5", "23_SET_VELOCITA'_NASTRO_A_PUNTE_SCARICO_CARICATORE_5_(###.#%)",  ua.VariantType.Float),
+    ("SET_VELOCITA_CILINDRO_LIM_CAR_5", "24_SET_VELOCITA'_CILINDRO_LIMITATORE_CARICATORE_5_(###.#%)",     ua.VariantType.Float),
+    ("SET_VELOCITA_TAVOLA_BASE_CAR_5",  "25_SET_VELOCITA'_AVANZAMENTO_TAVOLA_BASE_CARICATORE_5_(###.#%)", ua.VariantType.Float),
 ]
 
-MONITORAGGIO_TAGS = [
-    (GRP_SCAMBIO_R, "02_bit_LOTTO_INIZIATO_A_GESTIONALE"),
-    (GRP_SCAMBIO_R, "04_bit_LINEA_IN_FUNZIONE_A_GESTIONALE"),
-    (GRP_SCAMBIO_R, "05_bit_LINEA_IN_MANUTENZIONE_A_GESTIONALE"),
-    (GRP_LAVORO_R,  "01_Numero_Lotto_IN_LAVORO"),
-    (GRP_LAVORO_R,  "02_Codice_Lotto_IN_LAVORO"),
-    (GRP_LAVORO_R,  "03_Articolo_Lotto_IN_LAVORO"),
-    (GRP_LAVORO_R,  "04_VIS_SET_TOTALE_grammi_DOSAGGIO_(#####gr)_(in_lavoro)"),
-    (GRP_LAVORO_R,  "05_VIS_SET_VELOCITA'_NASTRO_RACCOLTA_(###.#%)_(in_lavoro)"),
-    (GRP_LAVORO_R,  "06_VIS_SET_VELOCITA'_MASTER_LINEA_(in_lavoro)"),
-    (GRP_VEL_R,     "01_VIS_VEL_ATTUALE_NASTRO_RACCOLTA_(###.#%)_(misurazione)"),
-    (GRP_VEL_R,     "22_VIS_grammi_PESATA_MEDIA_CARICATORE_1_(#####gr)_(misurazione)"),
-    (GRP_VEL_R,     "23_VIS_grammi_ERRORE_MEDIO_CARICATORE_1_(#####gr)_(misurazione)"),
-    (GRP_VEL_R,     "24_VIS_grammi_PESATA_MEDIA_CARICATORE_2_(#####gr)_(misurazione)"),
-    (GRP_VEL_R,     "25_VIS_grammi_ERRORE_MEDIO_CARICATORE_2_(#####gr)_(misurazione)"),
-    (GRP_VEL_R,     "26_VIS_grammi_PESATA_MEDIA_CARICATORE_3_(#####gr)_(misurazione)"),
-    (GRP_VEL_R,     "27_VIS_grammi_ERRORE_MEDIO_CARICATORE_3_(#####gr)_(misurazione)"),
-    (GRP_VEL_R,     "28_VIS_grammi_PESATA_MEDIA_CARICATORE_4_(#####gr)_(misurazione)"),
-    (GRP_VEL_R,     "29_VIS_grammi_ERRORE_MEDIO_CARICATORE_4_(#####gr)_(misurazione)"),
-    (GRP_VEL_R,     "30_VIS_grammi_PESATA_MEDIA_CARICATORE_5_(#####gr)_(misurazione)"),
-    (GRP_VEL_R,     "31_VIS_grammi_ERRORE_MEDIO_CARICATORE_5_(#####gr)_(misurazione)"),
+# Tutti i 26 Tag della ricetta effettivamente in lavoro sul PLC (Gruppo 4)
+TAGS_RICETTA_IN_LAVORO = [
+    (GRP_LAVORO_R, "01_Numero_Lotto_IN_LAVORO"),
+    (GRP_LAVORO_R, "02_Codice_Lotto_IN_LAVORO"),
+    (GRP_LAVORO_R, "03_Articolo_Lotto_IN_LAVORO"),
+    (GRP_LAVORO_R, "04_VIS_SET_TOTALE_grammi_DOSAGGIO_(#####gr)_(in_lavoro)"),
+    (GRP_LAVORO_R, "05_VIS_SET_VELOCITA'_NASTRO_RACCOLTA_(###.#%)_(in_lavoro)"),
+    (GRP_LAVORO_R, "06_VIS_SET_VELOCITA'_MASTER_LINEA_(in_lavoro)"),
+    (GRP_LAVORO_R, "07_VIS_SET_COMPONENTE_CARICATORE_1_(###.#%)_(in_lavoro)"),
+    (GRP_LAVORO_R, "08_VIS_SET_VEL_NASTRO_A_PUNTE_SCARICO_CARICATORE_1_(###.#%)_(in_lavoro)"),
+    (GRP_LAVORO_R, "09_VIS_SET_VEL_CILINDRO_LIMITATORE_CARICATORE_1_(###.#%)_(in_lavoro)"),
+    (GRP_LAVORO_R, "10_VIS_SET_VEL_AVANZAMENTO_TAVOLA_BASE_CARICATORE_1_(###.#%)_(in_lavoro)"),
+    (GRP_LAVORO_R, "11_VIS_SET_COMPONENTE_CARICATORE_2_(###.#%)_(in_lavoro)"),
+    (GRP_LAVORO_R, "12_VIS_SET_VEL_NASTRO_A_PUNTE_SCARICO_CARICATORE_2_(###.#%)_(in_lavoro)"),
+    (GRP_LAVORO_R, "13_VIS_SET_VEL_CILINDRO_LIMITATORE_CARICATORE_2_(###.#%)_(in_lavoro)"),
+    (GRP_LAVORO_R, "14_VIS_SET_VEL_AVANZAMENTO_TAVOLA_BASE_CARICATORE_2_(###.#%)_(in_lavoro)"),
+    (GRP_LAVORO_R, "15_VIS_SET_COMPONENTE_CARICATORE_3_(###.#%)_(in_lavoro)"),
+    (GRP_LAVORO_R, "16_VIS_SET_VEL_NASTRO_A_PUNTE_SCARICO_CARICATORE_3_(###.#%)_(in_lavoro)"),
+    (GRP_LAVORO_R, "17_VIS_SET_VEL_CILINDRO_LIMITATORE_CARICATORE_3_(###.#%)_(in_lavoro)"),
+    (GRP_LAVORO_R, "18_VIS_SET_VEL_AVANZAMENTO_TAVOLA_BASE_CARICATORE_3_(###.#%)_(in_lavoro)"),
+    (GRP_LAVORO_R, "19_VIS_SET_COMPONENTE_CARICATORE_4_(###.#%)_(in_lavoro)"),
+    (GRP_LAVORO_R, "20_VIS_SET_VEL_NASTRO_A_PUNTE_SCARICO_CARICATORE_4_(###.#%)_(in_lavoro)"),
+    (GRP_LAVORO_R, "21_VIS_SET_VEL_CILINDRO_LIMITATORE_CARICATORE_4_(###.#%)_(in_lavoro)"),
+    (GRP_LAVORO_R, "22_VIS_SET_VEL_AVANZAMENTO_TAVOLA_BASE_CARICATORE_4_(###.#%)_(in_lavoro)"),
+    (GRP_LAVORO_R, "23_VIS_SET_COMPONENTE_CARICATORE_5_(###.#%)_(in_lavoro)"),
+    (GRP_LAVORO_R, "24_VIS_SET_VEL_NASTRO_A_PUNTE_SCARICO_CARICATORE_5_(###.#%)_(in_lavoro)"),
+    (GRP_LAVORO_R, "25_VIS_SET_VEL_CILINDRO_LIMITATORE_CARICATORE_5_(###.#%)_(in_lavoro)"),
+    (GRP_LAVORO_R, "26_VIS_SET_VEL_AVANZAMENTO_TAVOLA_BASE_CARICATORE_5_(###.#%)_(in_lavoro)"),
 ]
 
-ARCHIVIO_LOTTO_TAGS = [
-    (GRP_LAVORO_R,   "01_Numero_Lotto_IN_LAVORO"),
-    (GRP_LAVORO_R,   "02_Codice_Lotto_IN_LAVORO"),
-    (GRP_LAVORO_R,   "03_Articolo_Lotto_IN_LAVORO"),
+# Tutti i 16 Tag di inizio/fine e totalizzazione Kg (Gruppo 6)
+TAGS_CONSUNTIVO_E_TEMPI = [
     (GRP_ARCHIVIO_R, "01_INIZIO_LOTTO_MINUTI"),
     (GRP_ARCHIVIO_R, "02_INIZIO_LOTTO_ORA"),
     (GRP_ARCHIVIO_R, "03_INIZIO_LOTTO_GIORNO"),
@@ -148,9 +155,33 @@ ARCHIVIO_LOTTO_TAGS = [
     (GRP_ARCHIVIO_R, "16_VIS_TOTALIZZAZIONE_PRODUZIONE_Kg_CARICATORE_5"),
 ]
 
+# Tag di stato e misurazioni istantanee (Gruppi 0 e 5)
+TAGS_STATO_E_MISURE = [
+    (GRP_SCAMBIO_R, "02_bit_LOTTO_INIZIATO_A_GESTIONALE"),
+    (GRP_SCAMBIO_R, "04_bit_LINEA_IN_FUNZIONE_A_GESTIONALE"),
+    (GRP_SCAMBIO_R, "05_bit_LINEA_IN_MANUTENZIONE_A_GESTIONALE"),
+    (GRP_VEL_R,     "01_VIS_VEL_ATTUALE_NASTRO_RACCOLTA_(###.#%)_(misurazione)"),
+    (GRP_VEL_R,     "22_VIS_grammi_PESATA_MEDIA_CARICATORE_1_(#####gr)_(misurazione)"),
+    (GRP_VEL_R,     "23_VIS_grammi_ERRORE_MEDIO_CARICATORE_1_(#####gr)_(misurazione)"),
+    (GRP_VEL_R,     "24_VIS_grammi_PESATA_MEDIA_CARICATORE_2_(#####gr)_(misurazione)"),
+    (GRP_VEL_R,     "25_VIS_grammi_ERRORE_MEDIO_CARICATORE_2_(#####gr)_(misurazione)"),
+    (GRP_VEL_R,     "26_VIS_grammi_PESATA_MEDIA_CARICATORE_3_(#####gr)_(misurazione)"),
+    (GRP_VEL_R,     "27_VIS_grammi_ERRORE_MEDIO_CARICATORE_3_(#####gr)_(misurazione)"),
+    (GRP_VEL_R,     "28_VIS_grammi_PESATA_MEDIA_CARICATORE_4_(#####gr)_(misurazione)"),
+    (GRP_VEL_R,     "29_VIS_grammi_ERRORE_MEDIO_CARICATORE_4_(#####gr)_(misurazione)"),
+    (GRP_VEL_R,     "30_VIS_grammi_PESATA_MEDIA_CARICATORE_5_(#####gr)_(misurazione)"),
+    (GRP_VEL_R,     "31_VIS_grammi_ERRORE_MEDIO_CARICATORE_5_(#####gr)_(misurazione)"),
+]
+
+# Composizione completa per i due report CSV
+MONITORAGGIO_TAGS = TAGS_STATO_E_MISURE + TAGS_RICETTA_IN_LAVORO + TAGS_CONSUNTIVO_E_TEMPI
+ARCHIVIO_LOTTO_TAGS = TAGS_RICETTA_IN_LAVORO + TAGS_CONSUNTIVO_E_TEMPI
+
+# ==============================================================================
+# FUNZIONI DI SUPPORTO OPC-UA, JSON E CSV
+# ==============================================================================
 def get_node(client, group, tag_name):
     node_id_str = f"ns={NAMESPACE_INDEX};s={DEVICE_NAME}.Tags.{group}.{tag_name}"
-    # logger.debug(f"Accesso al nodo OPC-UA: {node_id_str}")
     return client.get_node(node_id_str)
 
 def read_tag(client, group, tag_name):
@@ -160,39 +191,48 @@ def read_tag(client, group, tag_name):
 
 def write_tag(client, group, tag_name, value, fallback_variant_type=None):
     node = get_node(client, group, tag_name)
-
-    # 1. Rileva il tipo esatto atteso dal server leggendo il Variant corrente
+    
     try:
         current_variant = node.get_data_value().Value
         target_type = current_variant.VariantType if current_variant is not None else fallback_variant_type
     except Exception:
         target_type = fallback_variant_type
 
-    # 2. Conversione del dato Python nel tipo nativo del PLC
     valore_convertito = value
     if target_type == ua.VariantType.Boolean:
         valore_convertito = bool(value)
-    elif target_type in (ua.VariantType.Int16, ua.VariantType.Int32):
-        valore_convertito = int(value)
-    elif target_type in (ua.VariantType.UInt16, ua.VariantType.UInt32):
+    elif target_type in (ua.VariantType.Int16, ua.VariantType.Int32, ua.VariantType.UInt16, ua.VariantType.UInt32, ua.VariantType.Byte):
         valore_convertito = int(value)
     elif target_type in (ua.VariantType.Float, ua.VariantType.Double):
         valore_convertito = float(value)
     elif target_type == ua.VariantType.String:
         valore_convertito = str(value)
-    elif target_type == ua.VariantType.Byte:
-        valore_convertito = int(value)
 
-    # 3. Creazione del Variant
     variant = ua.Variant(valore_convertito, target_type)
-
-    # 4. Creazione corretta di DataValue con solo il valore (senza timestamp/status)
     dv = ua.DataValue(variant)
-    
-    # 5. Scrittura del solo attributo Value (Id 13)
     node.set_attribute(ua.AttributeIds.Value, dv)
-    
     logger.debug(f"Scrittura Tag [{tag_name}] -> Valore: {valore_convertito} (Tipo: {target_type})")
+
+def formatta_timestamp_plc(dati_dict):
+    """Aggiunge due colonne leggibili YYYY-MM-DD HH:MM ricavate dai registri del PLC."""
+    try:
+        dati_dict["Data_Ora_Inizio_PLC"] = (
+            f"{int(dati_dict.get('05_INIZIO_LOTTO_ANNO', 0)):04d}-"
+            f"{int(dati_dict.get('04_INIZIO_LOTTO_MESE', 0)):02d}-"
+            f"{int(dati_dict.get('03_INIZIO_LOTTO_GIORNO', 0)):02d} "
+            f"{int(dati_dict.get('02_INIZIO_LOTTO_ORA', 0)):02d}:"
+            f"{int(dati_dict.get('01_INIZIO_LOTTO_MINUTI', 0)):02d}"
+        )
+        dati_dict["Data_Ora_Fine_PLC"] = (
+            f"{int(dati_dict.get('10_FINE_LOTTO_ANNO', 0)):04d}-"
+            f"{int(dati_dict.get('09_FINE_LOTTO_MESE', 0)):02d}-"
+            f"{int(dati_dict.get('08_FINE_LOTTO_GIORNO', 0)):02d} "
+            f"{int(dati_dict.get('07_FINE_LOTTO_ORA', 0)):02d}:"
+            f"{int(dati_dict.get('06_FINE_LOTTO_MINUTI', 0)):02d}"
+        )
+    except Exception:
+        dati_dict["Data_Ora_Inizio_PLC"] = ""
+        dati_dict["Data_Ora_Fine_PLC"] = ""
 
 def append_to_csv(filename, data_dict):
     file_exists = os.path.isfile(filename)
@@ -242,6 +282,9 @@ def valida_commessa(commessa):
         return False
     return True
 
+# ==============================================================================
+# GESTIONE PROCEDURE PLC
+# ==============================================================================
 def gestisci_invio_ricetta(client):
     try:
         commessa, filepath = preleva_commessa_piu_vecchia()
@@ -260,12 +303,12 @@ def gestisci_invio_ricetta(client):
 
             if var_type == ua.VariantType.String:
                 valore = str(valore)[:20]
-            elif var_type == ua.VariantType.UInt32:
-                valore = int(valore)
-            elif var_type == ua.VariantType.Float:
-                valore = float(valore)
 
-            write_tag(client, GRP_LOTTO_W, tag_name, valore, var_type)
+            try:
+                write_tag(client, GRP_LOTTO_W, tag_name, valore, var_type)
+            except Exception as e_tag:
+                logger.error(f"Errore scrittura su Tag '{tag_name}' (Valore: {valore}): {e_tag}")
+                raise e_tag
 
         write_tag(client, GRP_SCAMBIO_W, "01_bit_DATI_LOTTO_RICHIESTI_INVIATI_DA_GESTIONALE", True, ua.VariantType.Boolean)
         logger.info("Ricetta inviata e bit di conferma alzato a ON.")
@@ -284,10 +327,14 @@ def gestisci_fine_lotto(client):
         dati_archivio = {"Timestamp_Archiviazione": datetime.now().strftime("%Y-%m-%d %H:%M:%S")}
 
         for grp, tag_name in ARCHIVIO_LOTTO_TAGS:
-            dati_archivio[tag_name] = read_tag(client, grp, tag_name)
+            val = read_tag(client, grp, tag_name)
+            if isinstance(val, str):
+                val = val.strip().replace("\x00", "")
+            dati_archivio[tag_name] = val
 
+        formatta_timestamp_plc(dati_archivio)
         append_to_csv(CSV_ARCHIVIO_LOTTI_FILE, dati_archivio)
-        logger.info(f"Consuntivi salvati in '{CSV_ARCHIVIO_LOTTI_FILE}'.")
+        logger.info(f"Consuntivi e ricetta lavorata salvati in '{CSV_ARCHIVIO_LOTTI_FILE}'.")
 
         write_tag(client, GRP_SCAMBIO_W, "02_bit_DATI_FINE_LOTTO_ARCHIVIATI_DA_GESTIONALE", True, ua.VariantType.Boolean)
         return True
@@ -299,11 +346,19 @@ def registra_telemetria(client):
     try:
         riga_csv = {"Timestamp": datetime.now().strftime("%Y-%m-%d %H:%M:%S")}
         for grp, tag_name in MONITORAGGIO_TAGS:
-            riga_csv[tag_name] = read_tag(client, grp, tag_name)
+            val = read_tag(client, grp, tag_name)
+            if isinstance(val, str):
+                val = val.strip().replace("\x00", "")
+            riga_csv[tag_name] = val
+
+        formatta_timestamp_plc(riga_csv)
         append_to_csv(CSV_MONITORAGGIO_FILE, riga_csv)
     except Exception as e:
         logger.warning(f"Impossibile registrare la telemetria: {e}")
 
+# ==============================================================================
+# MAIN LOOP
+# ==============================================================================
 def main():
     logger.info("Avvio servizio di interconnessione Industria 4.0 - Linea Tecnomeccanica Biellese")
     ultimo_salvataggio_telemetria = 0.0
@@ -350,8 +405,9 @@ def main():
         except KeyboardInterrupt:
             break
         except Exception as e:
-            logger.critical(f"Errore connessione: {e}. Ritentativo tra 5s...")
-            time.sleep(5)
+            sleep_time = 300
+            logger.critical(f"Errore connessione: {e}. Ritentativo tra {sleep_time} s...")
+            time.sleep(sleep_time)
         finally:
             try:
                 client.disconnect()

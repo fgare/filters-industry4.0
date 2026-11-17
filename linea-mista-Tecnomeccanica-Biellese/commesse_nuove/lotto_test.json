@@ -2,7 +2,7 @@
   "LOTTO_TEST_01": {
     "Numero_Lotto": 1001,
     "Codice_Lotto": "LOTTO_TEST_01",
-    "Articolo_Lotto": "ART_MISTO_ LANA",
+    "Articolo_Lotto": "ART_MISTO_LANA",
     "SET_TOTALE_grammi_DOSAGGIO": 2500.0,
     "SET_VELOCITA_NASTRO_RACCOLTA": 65.0,
     "SET_COMPONENTE_CARICATORE_1": 40.0,
